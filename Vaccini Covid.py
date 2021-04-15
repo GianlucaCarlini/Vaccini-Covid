@@ -5,18 +5,14 @@ Created on Mon Apr 12 15:00:54 2021
 @author: Gianluca
 """
 
-"""
-COVID VACCINI
-"""
-
 # %% IMPORT
 
 import pandas as pd
 import numpy as np
 from bokeh.plotting import figure, show
 from bokeh.models import Range1d, LinearAxis, HoverTool, ColumnDataSource
-from bokeh.models import BoxSelectTool, BoxZoomTool, WheelZoomTool
-from bokeh.layouts import row, column, gridplot
+from bokeh.models import BoxSelectTool, BoxZoomTool
+from bokeh.layouts import layout
 
 # %% FUNCTION DEFINITIONS
 
@@ -30,13 +26,84 @@ def convert_to_angle(total, x, rad = True):
     
     return angle
 
-#def build_data(list_range, df, total):
+def build_data(pop, df, fascia):
     
+    prime_dosi = (df['prima_dose'].loc[df['fascia_anagrafica'] == fascia].sum())
+    seconde_dosi = (df['seconda_dose'].loc[df['fascia_anagrafica'] == fascia].sum())
+    percentuale_prime = (prime_dosi/pop[fascia]) * 100
+    Percentuale_seconde = (seconde_dosi/pop[fascia]) * 100
+    
+    data = {'Prime Dosi' : [prime_dosi],
+            'Seconde Dosi' : [seconde_dosi],
+            'Percentuale Prime Dosi' : [percentuale_prime],
+            'Percentuale Seconde Dosi' : [Percentuale_seconde]}
+    
+    return data
 
+def build_annular(data, total, Title):
+    
+    tooltips = [('Prime Dosi', '@{Prime Dosi}'),
+                ('Seconde Dosi', '@{Seconde Dosi}'),
+                ('Percentuale Prime Dosi', '@{Percentuale Prime Dosi}'),
+                ('Percentuale Seconde Dosi', '@{Percentuale Seconde Dosi}')]
+    
+    p = figure(title = Title, plot_width = 250, plot_height = 250,
+                  x_range = (-1, 1), y_range = (-1, 1),
+                  toolbar_location = None)
+    p.annular_wedge(x = 0, y = 0, inner_radius = 0.65, outer_radius = 0.8,
+                   source = data,
+                   start_angle = 0, 
+                   end_angle = -convert_to_angle(total, data['Prime Dosi'][0]),
+                   direction = 'clock',
+                   color = '#F7DE95')
+
+    p.annular_wedge(x = 0, y = 0, inner_radius = 0.65, outer_radius = 0.8,
+                   source = data,
+                   start_angle = -convert_to_angle(total, 
+                                                   data['Prime Dosi'][0]),
+                   end_angle = 0,
+                   direction = 'clock',
+                   color = '#DDDDDD')
+
+    p.annular_wedge(x = 0, y = 0, inner_radius = 0.5, outer_radius = 0.65,
+                   source = data,
+                   start_angle = 0, 
+                   end_angle = -convert_to_angle(total, 
+                                                 data['Seconde Dosi'][0]),
+                   direction = 'clock',
+                   color = '#94CFA0')
+
+    p.annular_wedge(x = 0, y = 0, inner_radius = 0.5, outer_radius = 0.65,
+                   source = data,
+                   start_angle = -convert_to_angle(total,
+                                                   data['Seconde Dosi'][0]),
+                   end_angle = 0,
+                   direction = 'clock',
+                   color = '#DDDDDD')
+    
+    p.add_tools(HoverTool(tooltips = tooltips))
+
+    p.outline_line_color = None
+
+    p.grid.grid_line_color = None
+
+    p.axis.visible = False
+    
+    return p
 # %% DATA
 
 POP_ITA = 50.773e6 # Over 16
 OVER_80 = 4419707
+
+pop_eta = {'90+'   :  791543,
+           '80-89' : 3628160,
+           '70-79' : 5968373,
+           '60-69' : 7364364,
+           '50-59' : 9414195,
+           '40-49' : 8937229,
+           '30-39' : 6854632,
+           '20-29' : 6084382
+           }
 
 url_vaccini_summary = "https://raw.githubusercontent.com/italia/covid19-opendata-vaccini/master/dati/vaccini-summary-latest.csv"
 url_somministrazioni_summary = 'https://raw.githubusercontent.com/italia/covid19-opendata-vaccini/master/dati/somministrazioni-vaccini-summary-latest.csv'
@@ -149,35 +216,15 @@ colori = ['#F7DE95', '#94CFA0']
 Categorie
 """
 
-Prime_Dosi_Over_80 = (somministrazioni['prima_dose'].loc[somministrazioni['fascia_anagrafica'] == '80-89'].sum() + 
-                      somministrazioni['prima_dose'].loc[somministrazioni['fascia_anagrafica'] == '90+'].sum())
+fascia_90_piu = build_data(pop_eta, somministrazioni, '90+')
+fascia_80_89 = build_data(pop_eta, somministrazioni, '80-89')
+fascia_70_79 = build_data(pop_eta, somministrazioni, '70-79')
+fascia_60_69 = build_data(pop_eta, somministrazioni, '60-69')
+fascia_50_59 = build_data(pop_eta, somministrazioni, '50-59')
+fascia_40_49 = build_data(pop_eta, somministrazioni, '40-49')
+fascia_30_39 = build_data(pop_eta, somministrazioni, '30-39')
+fascia_20_29 = build_data(pop_eta, somministrazioni, '20-29')
 
-Seconde_Dosi_Over_80 = (somministrazioni['seconda_dose'].loc[somministrazioni['fascia_anagrafica'] == '80-89'].sum() +
-                        somministrazioni['seconda_dose'].loc[somministrazioni['fascia_anagrafica'] == '90+'].sum())
-
-Percentuale_prime_80 = (Prime_Dosi_Over_80 / OVER_80) * 100
-Percentuale_seconde_80 = (Seconde_Dosi_Over_80 / OVER_80) * 100 
-
-Over_80 = {'Prime Dosi' : [Prime_Dosi_Over_80],
-           'Seconde Dosi' : [Seconde_Dosi_Over_80],
-           'Percentuale Prime' : [Percentuale_prime_80],
-           'Percentuale Seconde' : [Percentuale_seconde_80]} 
-
-
-
-Prime_Dosi_70 = (somministrazioni['prima_dose'].loc[somministrazioni['fascia_anagrafica'] == '80-89'].sum() + 
-                 somministrazioni['prima_dose'].loc[somministrazioni['fascia_anagrafica'] == '90+'].sum())
-
-Seconde_Dosi_Over_70 = (somministrazioni['seconda_dose'].loc[somministrazioni['fascia_anagrafica'] == '80-89'].sum() +
-                        somministrazioni['seconda_dose'].loc[somministrazioni['fascia_anagrafica'] == '90+'].sum())
-
-Percentuale_prime_70 = (Prime_Dosi_Over_80 / OVER_80) * 100
-Percentuale_seconde_70 = (Seconde_Dosi_Over_80 / OVER_80) * 100 
-
-Over_70 = {'Prime Dosi' : [Prime_Dosi_Over_80],
-           'Seconde Dosi' : [Seconde_Dosi_Over_80],
-           'Percentuale Prime' : [Percentuale_prime_80],
-           'Percentuale Seconde' : [Percentuale_seconde_80]} 
 # %% VISUALIZATION
 
 
@@ -202,6 +249,7 @@ fig = figure(y_range = (0, 1.1*np.max(vaccini_giornalieri_italia)),
                     title='Somministrazioni Italia', x_axis_label='Data',
                     y_axis_label='Numero Vaccini', x_axis_type='datetime',
                     tools = 'wheel_zoom, reset',
+                    toolbar_location = 'above',
                     plot_width = 1000, plot_height = 600)
 
 fig.extra_y_ranges = {'totale': Range1d(start = 0,
@@ -240,13 +288,14 @@ Figura 2 - Totale Italia
 """
 
 tooltips2 = [('Prime Dosi', '@Totale_prime_dosi'),
-             ('Immunizzati', '@Totale_immunizzati'),
+             ('Seconde Dosi', '@Totale_immunizzati'),
              ('Percentuale prime dosi', '@Percentuale_prime_dosi'),
-             ('Percentuale immunizzati', '@Percentuale_immunizzati')]
+             ('Percentuale Seconde Dosi', '@Percentuale_immunizzati')]
 
-fig2 = figure(plot_width = 400, plot_height = 400,
+fig2 = figure(title = 'Totale Italia', plot_width = 550, plot_height = 550,
               x_range = (-1, 1), y_range = (-1, 1),
-              tools = 'wheel_zoom')
+              tools = 'wheel_zoom',
+              toolbar_location = None)
 fig2.axis.visible = False
 
 fig2.annular_wedge(x = 0, y = 0, inner_radius = 0.65, outer_radius = 0.8,
@@ -307,52 +356,17 @@ fig3.add_tools(HoverTool(tooltips=tooltips3))
 Figura 4 - Over 80
 """
 
-tooltips4 = [('Prime Dosi', '@{Prime Dosi}'),
-             ('Seconde Dosi', '@{Seconde Dosi}'),
-             ('Percentuale Prime Dosi', '@{Percentuale Prime}'),
-             ('Percentuale Seconde Dosi', '@{Percentuale Seconde}')]
+fig4 = build_annular(fascia_80_89, pop_eta['80-89'], '80 - 89 Anni')
+fig5 = build_annular(fascia_70_79, pop_eta['70-79'], '70 - 79 Anni')
+fig6 = build_annular(fascia_60_69, pop_eta['60-69'], '60 - 69 Anni')
+fig7 = build_annular(fascia_50_59, pop_eta['50-59'], '50 - 59 Anni')
+fig8 = build_annular(fascia_40_49, pop_eta['40-49'], '40 - 49 Anni')
+fig9 = build_annular(fascia_30_39, pop_eta['30-39'], '30 - 39 Anni')
+fig10 = build_annular(fascia_20_29, pop_eta['20-29'], '20 - 29 Anni')
+fig11 = build_annular(fascia_90_piu, pop_eta['90+'],  '90+ Anni')
 
-fig4 = figure(title = 'Over 80', plot_width = 250, plot_height = 250,
-              x_range = (-1, 1), y_range = (-1, 1),
-              toolbar_location = None)
 
-fig4.annular_wedge(x = 0, y = 0, inner_radius = 0.65, outer_radius = 0.8,
-                   source = Over_80,
-                   start_angle = 0, 
-                   end_angle = -convert_to_angle(OVER_80, Prime_Dosi_Over_80),
-                   direction = 'clock',
-                   color = '#F7DE95')
+lay = layout([[fig, fig2], [fig11, fig4, fig5, fig6], [fig7, fig8, fig9, fig10],
+              [fig3]])
 
-fig4.annular_wedge(x = 0, y = 0, inner_radius = 0.65, outer_radius = 0.8,
-                   source = Over_80,
-                   start_angle = -convert_to_angle(OVER_80, 
-                                                   Prime_Dosi_Over_80),
-                   end_angle = 0,
-                   direction = 'clock',
-                   color = '#DDDDDD')
-
-fig4.annular_wedge(x = 0, y = 0, inner_radius = 0.5, outer_radius = 0.65,
-                   source = Over_80,
-                   start_angle = 0, 
-                   end_angle = -convert_to_angle(OVER_80, Seconde_Dosi_Over_80),
-                   direction = 'clock',
-                   color = '#94CFA0')
-
-fig4.annular_wedge(x = 0, y = 0, inner_radius = 0.5, outer_radius = 0.65,
-                   source = Over_80,
-                   start_angle = -convert_to_angle(OVER_80, Seconde_Dosi_Over_80),
-                   end_angle = 0,
-                   direction = 'clock',
-                   color = '#DDDDDD')
-
-fig4.add_tools(HoverTool(tooltips = tooltips4))
-
-fig4.outline_line_color = None
-
-fig4.grid.grid_line_color = None
-
-fig4.axis.visible = False
-
-grid = gridplot([[fig, fig2], [fig3, fig4]])
-
-show(grid)
+show(lay)
