@@ -11,8 +11,9 @@ import pandas as pd
 import numpy as np
 from bokeh.plotting import figure, show
 from bokeh.models import Range1d, LinearAxis, HoverTool, ColumnDataSource
-from bokeh.models import BoxSelectTool, BoxZoomTool
+from bokeh.models import BoxSelectTool, BoxZoomTool, NumeralTickFormatter
 from bokeh.layouts import layout
+import datetime
 
 # %% FUNCTION DEFINITIONS
 
@@ -25,6 +26,14 @@ def convert_to_angle(total, x, rad = True):
         angle = angle * (PI/180)
     
     return angle
+
+def moving_average(x):
+    avg = []
+    for i in range(1, (len(x) - 7)):
+        avg.append(np.mean(x[i:i+7]))
+    for i in range(len(avg), len(x)):
+        avg.append(0)
+    return avg
 
 def build_data(pop, df, fascia):
     
@@ -42,10 +51,10 @@ def build_data(pop, df, fascia):
 
 def build_annular(data, total, Title):
     
-    tooltips = [('Prime Dosi', '@{Prime Dosi}'),
-                ('Seconde Dosi', '@{Seconde Dosi}'),
-                ('Percentuale Prime Dosi', '@{Percentuale Prime Dosi}'),
-                ('Percentuale Seconde Dosi', '@{Percentuale Seconde Dosi}')]
+    tooltips = [('Prime Dosi', '@{Prime Dosi}{(0.00 a)}'),
+                ('Seconde Dosi', '@{Seconde Dosi}{(0.00 a)}'),
+                ('Percentuale Prime Dosi', '@{Percentuale Prime Dosi}{(0.00 a)}'),
+                ('Percentuale Seconde Dosi', '@{Percentuale Seconde Dosi}{(0.00 a)}')]
     
     p = figure(title = Title, plot_width = 250, plot_height = 250,
                   x_range = (-1, 1), y_range = (-1, 1),
@@ -134,6 +143,8 @@ for i in giorni:
 
 vaccini_giornalieri_italia = np.array(vaccini_giornalieri_italia)
 
+media_settimanale = moving_average(vaccini_giornalieri_italia)
+
 """
 Prime dosi
 """
@@ -178,7 +189,8 @@ data_somministrazioni = {'Giorno': pd.to_datetime(giorni),
                          'Totale_somministrazioni': totale_vaccini_italia,
                          'Somministrazioni_giornaliere': vaccini_giornalieri_italia,
                          'Prime_dosi': prime_dosi,
-                         'Seconde_dosi': seconde_dosi,}
+                         'Seconde_dosi': seconde_dosi,
+                         'Media_Mobile' : media_settimanale}
 
 
 data_totali = {'Totale_prime_dosi' : [totale_prime_dosi],
@@ -237,17 +249,18 @@ Figura 1 - Giornaliere
 """
 
 tooltips1 = [('Giorno', '@Giorno{%F}'),
-            ('Somministrazioni Giornaliere', '@Somministrazioni_giornaliere'),
-            ('Somministrazioni Totali', '@Totale_somministrazioni'),
-            ('Prime Dosi', '@Prime_dosi'),
-            ('Seconde Dosi', '@Seconde_dosi')]
+            ('Somministrazioni Giornaliere', '@Somministrazioni_giornaliere{(0.00 a)}'),
+            ('Somministrazioni Totali', '@Totale_somministrazioni{(0.00 a)}'),
+            ('Prime Dosi', '@Prime_dosi{(0.00 a)}'),
+            ('Seconde Dosi', '@Seconde_dosi{(0.00 a)}'),
+            ('Media Mobile Settimanale', '@Media_Mobile{(0.00 a)}')]
 
 formatters = {'@Giorno': 'datetime'}
 
 
 fig = figure(y_range = (0, 1.1*np.max(vaccini_giornalieri_italia)),
                     title='Somministrazioni Italia', x_axis_label='Data',
-                    y_axis_label='Numero Vaccini', x_axis_type='datetime',
+                    y_axis_label='Vaccini Giornalieri', x_axis_type='datetime',
                     tools = 'wheel_zoom, reset',
                     toolbar_location = 'above',
                     plot_width = 1000, plot_height = 600)
@@ -259,23 +272,30 @@ fig.vbar(x = 'Giorno', bottom = 0,
          top = 'Prime_dosi',
          source = somministrazioni_italia_cds, 
          legend_label = 'Prime Dosi',
-         color = '#EFB90A')
+         width = datetime.timedelta(days=0.5),
+         color = '#F7DE95')
 
 fig.vbar(x = 'Giorno', bottom = 'Prime_dosi',
          top = 'Somministrazioni_giornaliere',
          source = somministrazioni_italia_cds,
+         width = datetime.timedelta(days=0.5),
          legend_label = 'Seconde Dosi',
-         color = 'Green')
+         color = '#94CFA0')
 
 fig.line(x = 'Giorno', y = 'Totale_somministrazioni',
          source = somministrazioni_italia_cds, 
          y_range_name = 'totale', color = '#93C4D7',
-         legend_label = 'Totali', line_width = 2)
+         legend_label = 'Totali', line_width = 3)
+
+fig.line(x = 'Giorno', y = 'Media_Mobile',
+         source = somministrazioni_italia_cds,
+         color = 'black', legend_label = 'Media Mobile',
+         line_width = 2)
 
 fig.add_layout(LinearAxis(y_range_name='totale'), 'right')
 
 fig.add_tools(HoverTool(tooltips = tooltips1, formatters = formatters,
-                        mode = 'vline'))
+                        mode = 'mouse'))
 
 fig.add_tools(BoxSelectTool(dimensions = 'width'))
 
@@ -283,14 +303,18 @@ fig.add_tools(BoxZoomTool(dimensions = 'width'))
 
 fig.legend.location = 'top_left'
 
+fig.yaxis[0].formatter = NumeralTickFormatter(format="000k")
+fig.yaxis[1].formatter = NumeralTickFormatter(format="0 a")
+fig.yaxis[1].axis_label = 'Vaccini Totali'
+
 """
 Figura 2 - Totale Italia
 """
 
-tooltips2 = [('Prime Dosi', '@Totale_prime_dosi'),
-             ('Seconde Dosi', '@Totale_immunizzati'),
-             ('Percentuale prime dosi', '@Percentuale_prime_dosi'),
-             ('Percentuale Seconde Dosi', '@Percentuale_immunizzati')]
+tooltips2 = [('Prime Dosi', '@Totale_prime_dosi{(0.00 a)}'),
+             ('Seconde Dosi', '@Totale_immunizzati{(0.00 a)}'),
+             ('Percentuale prime dosi', '@Percentuale_prime_dosi{(0.00 a)}'),
+             ('Percentuale Seconde Dosi', '@Percentuale_immunizzati{(0.00 a)}')]
 
 fig2 = figure(title = 'Totale Italia', plot_width = 550, plot_height = 550,
               x_range = (-1, 1), y_range = (-1, 1),
@@ -337,8 +361,8 @@ fig2.grid.grid_line_color = None
 Figura 3 - Regioni
 """
 
-tooltips3 = [('Regione', '@Regioni'), ('Prime dosi', '@{Prime dosi}'),
-            ('Seconde dosi', '@{Seconde dosi}')]
+tooltips3 = [('Regione', '@Regioni'), ('Prime dosi', '@{Prime dosi}{(0.00 a)}'),
+            ('Seconde dosi', '@{Seconde dosi}{(0.00 a)}')]
 
 fig3 = figure(x_range = Regioni, title = 'Somministrazioni Regioni',
               plot_width = 1000, plot_height = 600,
@@ -351,6 +375,8 @@ fig3.xaxis.major_label_orientation = 1
 
 fig3.add_tools(HoverTool(tooltips=tooltips3))
 
+fig3.yaxis[0].formatter = NumeralTickFormatter(format="0.0a")
+fig3.yaxis[0].axis_label = 'Vaccini Totali'
 
 """
 Figura 4 - Over 80
